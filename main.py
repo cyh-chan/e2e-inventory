@@ -121,8 +121,8 @@ def run_inventory_simulation(
 
     # Add tracking for pending orders in labelling policy
     pending_order_labelling = None
-    po_labelling = dict()  # Track reorder quantities
-    actual_po_reaching_labelling = []  # Track actual delivery dates
+    po_labelling = dict()
+    actual_po_reaching_labelling = []
 
     # Initialize variables for different policies
     inventory_level_ss = np.zeros(horizon)
