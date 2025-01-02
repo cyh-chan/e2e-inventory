@@ -302,7 +302,7 @@ def plot_inventory_simulation(
     inventory_level_ss,
     inventory_level_sq,
     inventory_level_labelling,
-    inventory_level_out,  # Order-Up-To Policy inventory levels
+    inventory_level_out,
     dates,
     po_ss,
     po_sq,
