@@ -10,31 +10,14 @@ def create_e2e_model(
         n_dyn_fea=1,
         n_outputs=1,
         n_dilated_layers=3,
-        kernel_size=2,
+        kernel_size=3,
         n_filters=3,
         dropout_rate=0.1,
         max_cat_id=[100, 100],
 ):
-    """Create E2E inventory replenishment model,
-        with a Dilated CNN model for demand forecast.
-        Demand forecast horizon is specified by n_outputs
-        Future VLT is forecasted by 1 step ahead
-        Optimal Reorder Quantity is predicted by 1 step ahead also
 
-    Args:
-        seq_len (int): Input sequence length
-        n_dyn_fea (int): Number of dynamic features
-        n_outputs (int): Number of outputs of the network
-        kernel_size (int): Kernel size of each convolutional layer
-        n_filters (int): Number of filters in each convolutional layer
-        dropout_rate (float): Dropout rate in the network
-        max_cat_id (list[int]): Each entry in the list represents the maximum value of the ID of a specific categorical variable.
-
-    Returns:
-        object: Keras Model object
-    """
     # Sequential input for dynamic features
-    seq_in = Input(shape=(seq_len, n_dyn_fea))
+    seq_in = Input(shape=(seq_len, n_dyn_fea));
 
     # Categorical input
     n_cat_fea = len(max_cat_id)
@@ -99,7 +82,7 @@ def create_e2e_model(
 
     return model
 
-
+# Original defined below:
 def custom_loss(y_true, y_pred):
     # Calculate binary cross entropy
     mse = tf.keras.losses.MeanSquaredError()
@@ -111,6 +94,9 @@ def custom_loss(y_true, y_pred):
 
     return loss
 
+# def custom_loss(y_true, y_pred):
+#     mse = tf.keras.losses.MeanSquaredError()
+#     return mse(y_true, y_pred)
 
 # def custom_loss(y_true, y_pred):
 #     epsilon = 1e-5  # Small constant to avoid division by zero
@@ -124,4 +110,24 @@ def custom_loss(y_true, y_pred):
 #     )
 #
 #     return loss
+
+# def custom_loss(y_true, y_pred):
+#     # Initialize loss functions
+#     mse = tf.keras.losses.MeanSquaredError()
+#     mape = tf.keras.losses.MeanAbsolutePercentageError()
+#
+#     # Calculate combined loss for each output
+#     # For demand forecast (df_output)
+#     df_loss = 0.5 * mse(y_true[0], y_pred[0]) + 0.5 * mape(y_true[0], y_pred[0])
+#
+#     # For reorder quantity (layer4_output)
+#     rq_loss = 0.5 * mse(y_true[1], y_pred[1]) + 0.5 * mape(y_true[1], y_pred[1])
+#
+#     # For VLT prediction (vlt_output)
+#     vlt_loss = 0.5 * mse(y_true[2], y_pred[2]) + 0.5 * mape(y_true[2], y_pred[2])
+#
+#     # Combine losses with original weights
+#     final_loss = 0.05 * df_loss + 0.9 * rq_loss + 0.05 * vlt_loss
+#
+#     return final_loss
 

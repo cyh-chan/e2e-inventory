@@ -14,6 +14,9 @@ import time
 import onnx
 import onnxruntime
 import tf2onnx
+from scipy import stats
+import scipy.stats as stats
+import statsmodels.api as sm
 
 serialization_lib.enable_unsafe_deserialization()
 
@@ -23,7 +26,7 @@ MAX_SKU_ID = 100
 MAX_STORE_ID = 50
 BATCH_SIZE = 1024
 LEARNING_RATE = 1e-4
-EPOCHS = 200
+EPOCHS = 20
 
 horizon = 90  # number of days in review period (consider x days in the future for optimal inventory position)
 train_horizon = 60
@@ -139,6 +142,10 @@ model = create_e2e_model(
 adam = optimizers.Adam(learning_rate=LEARNING_RATE)
 sgd = optimizers.SGD()
 model.compile(loss="mse", optimizer=adam)
+# model.compile(
+#     optimizer='adam',
+#     loss=custom_loss,
+# )
 # Define checkpoint and fit model
 checkpoint = ModelCheckpoint(model_file_name, monitor="loss", save_best_only=True, mode="min", verbose=1)
 tensorboard_callback = tf.keras.callbacks.TensorBoard(
@@ -302,8 +309,6 @@ plt.xlabel('Epochs')
 plt.ylabel('Loss')
 plt.show()
 
-# Currently, the model is using mse as the loss, accuracy is not tracked unless we explicitly set it as a metric?
-
 def convert_to_onnx(model, output_path, seq_len, n_dynamic_features):
     print("Starting ONNX conversion...")
 
@@ -349,6 +354,7 @@ if __name__ == "__main__":
     model_file_name = "e2e.keras"
     model = load_model(model_file_name, custom_objects={"custom_loss": custom_loss})
 
+'''
     # Define ONNX conversion parameters
     onnx_model_path = "e2e_model.onnx"
     seq_len = 15
@@ -371,4 +377,254 @@ if __name__ == "__main__":
     df_pred, optimal_qty_pred, vlt_pred = outputs
 
     # Optional: Log or visualize predictions
-    print("Demand forecast predictions:", df_pred)
+    # print("Demand forecast predictions:", df_pred)
+'''
+
+def check_overfitting(history, save_plots=True):
+
+    # Extract loss values
+    train_loss = history.history['loss']
+    epochs = range(1, len(train_loss) + 1)
+
+    # Calculate moving averages to smooth out fluctuations
+    window = 5
+    train_ma = np.convolve(train_loss, np.ones(window) / window, mode='valid')
+
+    # Define overfitting criteria
+    min_epochs = 10
+    sustained_period = 5  # Number of epochs to confirm trend
+
+    # Initialize analysis results
+    is_overfitting = False
+    analysis = {
+        'train_loss': train_loss,
+        'train_loss_trend': np.diff(train_ma[-sustained_period:]).mean(),
+        'min_loss': min(train_loss),
+        'final_loss': train_loss[-1],
+        'improvement_rate': None
+    }
+
+    # Calculate recent improvement rate
+    if len(train_loss) >= sustained_period:
+        recent_improvement = (train_loss[-sustained_period] - train_loss[-1]) / train_loss[-sustained_period]
+        analysis['improvement_rate'] = recent_improvement
+
+    # Create detailed loss plot
+    plt.figure(figsize=(12, 6))
+    plt.plot(epochs, train_loss, 'b-', label='Training Loss', linewidth=1)
+    plt.plot(epochs[window - 1:], train_ma, 'r-', label='Moving Average', linewidth=2)
+    plt.title('Training Loss Over Time')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.grid(True)
+
+    if save_plots:
+        plt.savefig("training_loss.png")
+
+    # Check for overfitting conditions
+    if len(train_loss) >= min_epochs:
+        # Condition 1: Loss plateauing
+        if analysis['improvement_rate'] is not None and analysis['improvement_rate'] < 0.001:
+            is_overfitting = True
+            analysis['message'] = 'Training has plateaued with minimal improvement'
+
+        # Condition 2: Loss increasing in recent epochs
+        elif analysis['train_loss_trend'] > 0:
+            is_overfitting = True
+            analysis['message'] = 'Training loss is increasing'
+
+        # Condition 3: Significant deviation from minimum loss
+        elif (train_loss[-1] - analysis['min_loss']) / analysis['min_loss'] > 0.1:
+            is_overfitting = True
+            analysis['message'] = 'Current loss significantly higher than best achieved'
+
+        else:
+            analysis['message'] = 'No clear signs of overfitting detected'
+
+    else:
+        analysis['message'] = 'Not enough epochs to determine overfitting'
+
+    # Add training statistics
+    analysis['statistics'] = {
+        'total_epochs': len(train_loss),
+        'best_epoch': np.argmin(train_loss) + 1,
+        'best_loss': min(train_loss),
+        'final_loss': train_loss[-1],
+        'loss_improvement': (train_loss[0] - train_loss[-1]) / train_loss[0] * 100
+    }
+
+    plt.close()
+    return is_overfitting, analysis
+
+
+# Example usage with your existing code:
+# After model training:
+is_overfitting, analysis = check_overfitting(history)
+
+print(f"Overfitting detected: {is_overfitting}")
+print(f"Analysis: {analysis['message']}")
+print("\nTraining Statistics:")
+print(f"Total epochs: {analysis['statistics']['total_epochs']}")
+print(f"Best epoch: {analysis['statistics']['best_epoch']}")
+print(f"Best loss: {analysis['statistics']['best_loss']:.6f}")
+print(f"Final loss: {analysis['statistics']['final_loss']:.6f}")
+print(f"Total improvement: {analysis['statistics']['loss_improvement']:.2f}%")
+
+
+def analyze_inventory_performance(inventory_levels, demand, holding_cost, backorder_cost, time_periods=None):
+    # Initialize results dictionary
+    results = {}
+
+    # Calculate holding and stockout quantities
+    positive_inventory = np.maximum(inventory_levels, 0)
+    stockouts = np.maximum(-inventory_levels, 0)
+
+    # Calculate costs
+    holding_costs = holding_cost * positive_inventory
+    stockout_costs = backorder_cost * stockouts
+    total_costs = holding_costs + stockout_costs
+
+    # Calculate averages
+    results['avg_holding_cost'] = np.mean(holding_costs)
+    results['avg_stockout_cost'] = np.mean(stockout_costs)
+    results['avg_total_cost'] = np.mean(total_costs)
+
+    # Calculate turnover rate (annual)
+    total_demand = np.sum(demand)
+    avg_inventory = np.mean(positive_inventory)
+    results['turnover_rate'] = (total_demand / avg_inventory) * (365 / len(inventory_levels))
+
+    # Calculate stockout ratio
+    stockout_periods = np.sum(stockouts > 0)
+    results['stockout_ratio'] = stockout_periods / len(inventory_levels)
+
+    # Perform t-tests
+    # H0: mean cost = 0 vs H1: mean cost ≠ 0
+    results['t_tests'] = {}
+
+    for cost_type, costs in [
+        ('holding_cost', holding_costs),
+        ('stockout_cost', stockout_costs),
+        ('total_cost', total_costs)
+    ]:
+        t_stat, p_value = stats.ttest_1samp(costs, 0)
+        results['t_tests'][cost_type] = {
+            't_statistic': t_stat,
+            'p_value': p_value
+        }
+
+    # Perform OLS regression
+    # Create time index
+    time_index = np.arange(len(inventory_levels))
+
+    # Prepare data for regression
+    X = sm.add_constant(np.column_stack((
+        time_index,
+        demand,
+        positive_inventory
+    )))
+
+    # Run regression for each cost type
+    results['regression'] = {}
+
+    for cost_type, y in [
+        ('holding_cost', holding_costs),
+        ('stockout_cost', stockout_costs),
+        ('total_cost', total_costs)
+    ]:
+        model = sm.OLS(y, X)
+        regression = model.fit()
+        results['regression'][cost_type] = {
+            'params': regression.params,
+            'r_squared': regression.rsquared,
+            'adj_r_squared': regression.rsquared_adj,
+            'f_stat': regression.fvalue,
+            'f_pvalue': regression.f_pvalue,
+            'summary': regression.summary()
+        }
+
+    # If time periods provided, calculate comparative statistics
+    if time_periods:
+        train_start, train_end, test_start, test_end = time_periods
+        results['comparative'] = {
+            'train': {
+                'avg_holding_cost': np.mean(holding_costs[train_start:train_end]),
+                'avg_stockout_cost': np.mean(stockout_costs[train_start:train_end]),
+                'avg_total_cost': np.mean(total_costs[train_start:train_end]),
+                'turnover_rate': (np.sum(demand[train_start:train_end]) /
+                                  np.mean(positive_inventory[train_start:train_end])) *
+                                 (365 / (train_end - train_start)),
+                'stockout_ratio': np.sum(stockouts[train_start:train_end] > 0) /
+                                  (train_end - train_start)
+            },
+            'test': {
+                'avg_holding_cost': np.mean(holding_costs[test_start:test_end]),
+                'avg_stockout_cost': np.mean(stockout_costs[test_start:test_end]),
+                'avg_total_cost': np.mean(total_costs[test_start:test_end]),
+                'turnover_rate': (np.sum(demand[test_start:test_end]) /
+                                  np.mean(positive_inventory[test_start:test_end])) *
+                                 (365 / (test_end - test_start)),
+                'stockout_ratio': np.sum(stockouts[test_start:test_end] > 0) /
+                                  (test_end - test_start)
+            }
+        }
+
+    return results
+
+
+def print_analysis_results(results):
+    print("\n=== Inventory Performance Analysis ===\n")
+
+    print("Cost Metrics:")
+    print(f"Average Holding Cost: {results['avg_holding_cost']:.2f}")
+    print(f"Average Stockout Cost: {results['avg_stockout_cost']:.2f}")
+    print(f"Average Total Cost: {results['avg_total_cost']:.2f}")
+
+    print("\nPerformance Metrics:")
+    print(f"Inventory Turnover Rate (annual): {results['turnover_rate']:.2f}")
+    print(f"Stockout Ratio: {results['stockout_ratio']:.2%}")
+
+    print("\nStatistical Tests:")
+    for cost_type, test_results in results['t_tests'].items():
+        print(f"\n{cost_type.replace('_', ' ').title()} T-Test:")
+        print(f"t-statistic: {test_results['t_statistic']:.4f}")
+        print(f"p-value: {test_results['p_value']:.4f}")
+
+    print("\nRegression Analysis:")
+    for cost_type, reg_results in results['regression'].items():
+        print(f"\n{cost_type.replace('_', ' ').title()} Regression:")
+        print(f"R-squared: {reg_results['r_squared']:.4f}")
+        print(f"Adjusted R-squared: {reg_results['adj_r_squared']:.4f}")
+        print(f"F-statistic: {reg_results['f_stat']:.4f}")
+        print(f"F-statistic p-value: {reg_results['f_pvalue']:.4f}")
+
+    if 'comparative' in results:
+        print("\nComparative Analysis:")
+        metrics = ['avg_holding_cost', 'avg_stockout_cost', 'avg_total_cost',
+                   'turnover_rate', 'stockout_ratio']
+
+        print("\nMetric               Training    Testing     % Change")
+        print("-" * 50)
+        for metric in metrics:
+            train_val = results['comparative']['train'][metric]
+            test_val = results['comparative']['test'][metric]
+            pct_change = ((test_val - train_val) / train_val) * 100
+
+            if metric == 'stockout_ratio':
+                print(f"{metric.replace('_', ' ').title():20} {train_val:.2%}    {test_val:.2%}    {pct_change:+.1f}%")
+            else:
+                print(f"{metric.replace('_', ' ').title():20} {train_val:.2f}    {test_val:.2f}    {pct_change:+.1f}%")
+
+
+# Example usage:
+# With your existing variables:
+results = analyze_inventory_performance(
+    inventory_levels=inventory_level,
+    demand=future_demand,
+    holding_cost=h,
+    backorder_cost=b,
+    time_periods=(0, train_horizon, train_horizon, horizon)
+)
+
+print_analysis_results(results)
