@@ -154,7 +154,7 @@ def custom_loss(y_true, y_pred):
     mse_vlt = F.mse_loss(vlt_pred, vlt_true)
 
     # Weighted sum of losses
-    loss = 0.7 * mse_df + 0.25 * mse_layer4 + 0.05 * mse_vlt
+    loss = 0.05 * mse_df + 0.9* mse_layer4 + 0.05 * mse_vlt
 
     return loss
 
