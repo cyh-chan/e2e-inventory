@@ -31,7 +31,7 @@ pip install numpy pandas matplotlib seaborn ydata_profiling
 ## Usage
 To visualize and summarize the inventory dataset, simply run the script:
 ```bash
-python visualize_inventory_data.py
+python e2e_data_generation_plots.py
 ```
 
 This will generate visualizations for each SKU, print summary statistics, and create an HTML report named `inventory_report.html`.
