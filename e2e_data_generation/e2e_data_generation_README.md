@@ -33,7 +33,7 @@ pip install numpy pandas keras
 To generate the inventory dataset, simply run the script:
 
 ```bash
-python generate_inventory_dataset.py
+python e2e_data_generation.py
 ```
 
 This will generate two files:
