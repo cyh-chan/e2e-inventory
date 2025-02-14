@@ -22,7 +22,7 @@ import time
 from data_preparation import load_data, prepare_data, create_data_loaders
 from model_training import train_model
 from evaluation import evaluate_model
-from visualization import plot_training_loss, prepare_forecast_data, plot_inventory_level, plot_demand_forecast
+from visualization import plot_training_loss, plot_training_accuracy, prepare_forecast_data, plot_inventory_level, plot_demand_forecast
 from analysis import analyze_inventory_performance, print_analysis_results
 from utils import check_overfitting
 
@@ -90,21 +90,36 @@ model = E2EModel(
 optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
 # Train model
-train_losses, df_pred = train_model(model, train_loader, val_loader, optimizer, device, EPOCHS, custom_loss)
+train_losses, val_losses, train_accuracies, val_accuracies, df_pred = train_model(
+    model, train_loader, val_loader, optimizer, device, EPOCHS, custom_loss
+)
+
+# Print accuracy (MAE) over epochs
+print("\nTraining MAE Over Epochs:")
+for epoch, (train_mae, val_mae) in enumerate(zip(train_accuracies, val_accuracies), 1):
+    print(f"Epoch {epoch}: Train MAE = {train_mae:.4f}, Val MAE = {val_mae:.4f}")
 
 # Evaluate model
 test_loss = evaluate_model(model, val_loader, device, custom_loss)
 
 # Check for overfitting
-is_overfitting, analysis = check_overfitting(train_losses)
-print(f"Overfitting detected: {is_overfitting}")
+is_overfitting, analysis = check_overfitting(
+    train_losses, val_losses, train_accuracies, val_accuracies, save_plots=True
+)
+print(f"\nOverfitting detected: {is_overfitting}")
 print(f"Analysis: {analysis['message']}")
 print("\nTraining Statistics:")
 print(f"Total epochs: {analysis['statistics']['total_epochs']}")
-print(f"Best epoch: {analysis['statistics']['best_epoch']}")
-print(f"Best loss: {analysis['statistics']['best_loss']:.6f}")
-print(f"Final loss: {analysis['statistics']['final_loss']:.6f}")
-print(f"Total improvement: {analysis['statistics']['loss_improvement']:.2f}%")
+print(f"Best epoch: {analysis['statistics']['best_train_epoch']}")
+print(f"Best train loss: {analysis['statistics']['best_train_loss']:.6f}")
+print(f"Final train loss: {analysis['statistics']['final_train_loss']:.6f}")
+print(f"Best val loss: {analysis['statistics']['best_val_loss']:.6f}")
+print(f"Final val loss: {analysis['statistics']['final_val_loss']:.6f}")
+print(f"Best train MAE: {analysis['statistics']['best_train_accuracy']:.4f}")
+print(f"Final train MAE: {analysis['statistics']['final_train_accuracy']:.4f}")
+print(f"Best val MAE: {analysis['statistics']['best_val_accuracy']:.4f}")
+print(f"Final val MAE: {analysis['statistics']['final_val_accuracy']:.4f}")
+print(f"Total improvement: {analysis['statistics']['val_loss_improvement']:.2f}%")
 
 # Analyze inventory performance
 results = analyze_inventory_performance(
@@ -121,6 +136,7 @@ print_analysis_results(results)
 train_time, train_inventory, test_time, test_inventory, train_demand, test_demand, forecasted_demand_reshaped = prepare_forecast_data(
     data, df_pred, train_horizon, horizon
 )
+
 # Plot inventory level
 plot_inventory_level(train_time, train_inventory, test_time, test_inventory)
 

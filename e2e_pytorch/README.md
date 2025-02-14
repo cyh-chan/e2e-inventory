@@ -84,17 +84,25 @@ optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 The model's performance is evaluated using various metrics, including training loss, overfitting analysis, and inventory performance metrics.
 
 **Overfitting Analysis** \
-The `check_overfitting` function analyzes the training loss to detect signs of overfitting:
+The `check_overfitting` function analyzes the training/validation loss and accuracy to detect signs of overfitting:
 ```bash
-is_overfitting, analysis = check_overfitting(train_losses)
-print(f"Overfitting detected: {is_overfitting}")
+is_overfitting, analysis = check_overfitting(
+    train_losses, val_losses, train_accuracies, val_accuracies, save_plots=True
+)
+print(f"\nOverfitting detected: {is_overfitting}")
 print(f"Analysis: {analysis['message']}")
 print("\nTraining Statistics:")
 print(f"Total epochs: {analysis['statistics']['total_epochs']}")
-print(f"Best epoch: {analysis['statistics']['best_epoch']}")
-print(f"Best loss: {analysis['statistics']['best_loss']:.6f}")
-print(f"Final loss: {analysis['statistics']['final_loss']:.6f}")
-print(f"Total improvement: {analysis['statistics']['loss_improvement']:.2f}%")
+print(f"Best epoch: {analysis['statistics']['best_train_epoch']}")
+print(f"Best train loss: {analysis['statistics']['best_train_loss']:.6f}")
+print(f"Final train loss: {analysis['statistics']['final_train_loss']:.6f}")
+print(f"Best val loss: {analysis['statistics']['best_val_loss']:.6f}")
+print(f"Final val loss: {analysis['statistics']['final_val_loss']:.6f}")
+print(f"Best train MAE: {analysis['statistics']['best_train_accuracy']:.4f}")
+print(f"Final train MAE: {analysis['statistics']['final_train_accuracy']:.4f}")
+print(f"Best val MAE: {analysis['statistics']['best_val_accuracy']:.4f}")
+print(f"Final val MAE: {analysis['statistics']['final_val_accuracy']:.4f}")
+print(f"Total improvement: {analysis['statistics']['val_loss_improvement']:.2f}%")
 ```
 
 **Inventory Performance Analysis** \

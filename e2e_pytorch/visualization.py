@@ -11,6 +11,16 @@ def plot_training_loss(train_losses):
     plt.grid(True)
     plt.show()
 
+def plot_training_accuracy(train_accuracies):
+    plt.figure(figsize=(10, 6))
+    plt.plot(train_accuracies, label='Training Accuracy')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.title('Training Accuracy Over Epochs')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
 def prepare_forecast_data(data, df_pred, train_horizon, horizon):
     # Create time axis for training and testing
     train_time = np.arange(0, train_horizon + 1)  # Time axis for training data (0 to 59 days)
