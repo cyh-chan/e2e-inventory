@@ -5,13 +5,13 @@ from tqdm import tqdm
 def train_model(model, train_loader, val_loader, optimizer, device, epochs, custom_loss):
     train_losses = []
     val_losses = []
-    train_accuracies = []
-    val_accuracies = []
+    train_mse = []
+    val_mse = []
 
     for epoch in range(epochs):
         model.train()
         train_loss = 0.0
-        train_correct = 0
+        train_mse_sum = 0.0
         train_total = 0
 
         for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs}"):
@@ -30,24 +30,23 @@ def train_model(model, train_loader, val_loader, optimizer, device, epochs, cust
 
             train_loss += loss.item()
 
-            # Calculate accuracy (assuming regression)
-            # For regression tasks, use Mean Absolute Error (MAE) or Root Mean Squared Error (RMSE)
-            # Here, we calculate MAE for df_pred and df_true
-            mae = torch.mean(torch.abs(df_pred - df_true.unsqueeze(1)))  # Align shapes
-            train_correct += mae.item()  # Use MAE as a proxy for accuracy
+            # Calculate MSE for df_pred and df_true
+            mse = torch.mean((df_pred - df_true.unsqueeze(1)) ** 2)  # Mean Squared Error
+            train_mse_sum += mse.item()
             train_total += 1
 
+        # Average train loss and MSE for the epoch
         avg_train_loss = train_loss / len(train_loader)
-        avg_train_accuracy = train_correct / train_total  # Average MAE over batches
+        avg_train_mse = train_mse_sum / train_total  # Average MSE over batches
         train_losses.append(avg_train_loss)
-        train_accuracies.append(avg_train_accuracy)
-        print(f"Epoch [{epoch+1}/{epochs}], Train Loss: {avg_train_loss:.4f}, Train MAE: {avg_train_accuracy:.4f}")
+        train_mse.append(avg_train_mse)
+        print(f"Epoch [{epoch+1}/{epochs}], Train Loss: {avg_train_loss:.4f}, Train MSE: {avg_train_mse:.4f}")
 
         # Validation
         model.eval()
         val_loss = 0.0
-        val_correct = 0
-        val_total = 0
+        val_mse_sum = 0.0  # Sum of MSE for all validation batches
+        val_total = 0      # Total number of validation batches
         with torch.no_grad():
             for batch in val_loader:
                 seq_in, cat_fea_in, vlt_in, rp_in, initial_stock_in, df_true, rp_true, vlt_true = batch
@@ -58,15 +57,16 @@ def train_model(model, train_loader, val_loader, optimizer, device, epochs, cust
                 loss = custom_loss((df_true, rp_true, vlt_true), (df_pred, layer4_pred, vlt_pred))
                 val_loss += loss.item()
 
-                # Calculate accuracy (MAE for validation)
-                mae = torch.mean(torch.abs(df_pred - df_true.unsqueeze(1)))
-                val_correct += mae.item()
+                # Calculate MSE for validation
+                mse = torch.mean((df_pred - df_true.unsqueeze(1)) ** 2)
+                val_mse_sum += mse.item()
                 val_total += 1
 
+        # Average validation loss and MSE for the epoch
         avg_val_loss = val_loss / len(val_loader)
-        avg_val_accuracy = val_correct / val_total  # Average MAE over batches
+        avg_val_mse = val_mse_sum / val_total  # Average MSE over validation batches
         val_losses.append(avg_val_loss)
-        val_accuracies.append(avg_val_accuracy)
-        print(f"Epoch [{epoch+1}/{epochs}], Validation Loss: {avg_val_loss:.4f}, Validation MAE: {avg_val_accuracy:.4f}")
+        val_mse.append(avg_val_mse)
+        print(f"Epoch [{epoch+1}/{epochs}], Validation Loss: {avg_val_loss:.4f}, Validation MSE: {avg_val_mse:.4f}")
 
-    return train_losses, val_losses, train_accuracies, val_accuracies, df_pred
+    return train_losses, val_losses, train_mse, val_mse, df_pred

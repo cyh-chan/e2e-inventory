@@ -48,7 +48,7 @@ MAX_SKU_ID = 100
 MAX_STORE_ID = 50
 BATCH_SIZE = 1024
 LEARNING_RATE = 1e-4
-EPOCHS = 20
+EPOCHS = 10
 
 horizon = 90  # number of days in review period (consider x days in the future for optimal inventory position)
 train_horizon = 60
@@ -75,6 +75,7 @@ train_input_dynamic_final, train_output_final, cate_feature_final, vlt_input, rp
 train_loader, val_loader = create_data_loaders(
     train_input_dynamic_final, cate_feature_final, vlt_input, rp_in, initial_stock_in, df_out, rp_out, vlt_out, BATCH_SIZE
 )
+
 # Initialize model, optimizer, and loss function
 model = E2EModel(
     seq_len=seq_len,
@@ -90,21 +91,21 @@ model = E2EModel(
 optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
 # Train model
-train_losses, val_losses, train_accuracies, val_accuracies, df_pred = train_model(
+train_losses, val_losses, train_mse, val_mse, df_pred = train_model(
     model, train_loader, val_loader, optimizer, device, EPOCHS, custom_loss
 )
 
-# Print accuracy (MAE) over epochs
-print("\nTraining MAE Over Epochs:")
-for epoch, (train_mae, val_mae) in enumerate(zip(train_accuracies, val_accuracies), 1):
-    print(f"Epoch {epoch}: Train MAE = {train_mae:.4f}, Val MAE = {val_mae:.4f}")
+# Print MSE over epochs
+print("\nTraining MSE Over Epochs:")
+for epoch, (train_mse_value, val_mse_value) in enumerate(zip(train_mse, val_mse), 1):
+    print(f"Epoch {epoch}: Train MSE = {train_mse_value:.4f}, Val MSE = {val_mse_value:.4f}")
 
 # Evaluate model
 test_loss = evaluate_model(model, val_loader, device, custom_loss)
 
 # Check for overfitting
 is_overfitting, analysis = check_overfitting(
-    train_losses, val_losses, train_accuracies, val_accuracies, save_plots=True
+    train_losses, val_losses, train_mse, val_mse, save_plots=True
 )
 print(f"\nOverfitting detected: {is_overfitting}")
 print(f"Analysis: {analysis['message']}")
@@ -115,10 +116,10 @@ print(f"Best train loss: {analysis['statistics']['best_train_loss']:.6f}")
 print(f"Final train loss: {analysis['statistics']['final_train_loss']:.6f}")
 print(f"Best val loss: {analysis['statistics']['best_val_loss']:.6f}")
 print(f"Final val loss: {analysis['statistics']['final_val_loss']:.6f}")
-print(f"Best train MAE: {analysis['statistics']['best_train_accuracy']:.4f}")
-print(f"Final train MAE: {analysis['statistics']['final_train_accuracy']:.4f}")
-print(f"Best val MAE: {analysis['statistics']['best_val_accuracy']:.4f}")
-print(f"Final val MAE: {analysis['statistics']['final_val_accuracy']:.4f}")
+print(f"Best train MSE: {analysis['statistics']['best_train_mse']:.4f}")
+print(f"Final train MSE: {analysis['statistics']['final_train_mse']:.4f}")
+print(f"Best val MSE: {analysis['statistics']['best_val_mse']:.4f}")
+print(f"Final val MSE: {analysis['statistics']['final_val_mse']:.4f}")
 print(f"Total improvement: {analysis['statistics']['val_loss_improvement']:.2f}%")
 
 # Analyze inventory performance

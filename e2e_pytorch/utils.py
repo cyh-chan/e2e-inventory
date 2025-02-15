@@ -1,19 +1,16 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-import numpy as np
-import matplotlib.pyplot as plt
-
-def check_overfitting(train_losses, val_losses=None, train_accuracies=None, val_accuracies=None, save_plots=True):
-    # Extract loss and accuracy values
+def check_overfitting(train_losses, val_losses=None, train_mse=None, val_mse=None, save_plots=True):
+    # Extract loss and MSE values
     epochs = range(1, len(train_losses) + 1)
 
     # Calculate moving averages to smooth out fluctuations
     window = 5
     train_loss_ma = np.convolve(train_losses, np.ones(window) / window, mode='valid')
     val_loss_ma = np.convolve(val_losses, np.ones(window) / window, mode='valid') if val_losses else None
-    train_acc_ma = np.convolve(train_accuracies, np.ones(window) / window, mode='valid') if train_accuracies else None
-    val_acc_ma = np.convolve(val_accuracies, np.ones(window) / window, mode='valid') if val_accuracies else None
+    train_mse_ma = np.convolve(train_mse, np.ones(window) / window, mode='valid') if train_mse else None
+    val_mse_ma = np.convolve(val_mse, np.ones(window) / window, mode='valid') if val_mse else None
 
     # Define overfitting criteria
     min_epochs = 10
@@ -31,8 +28,8 @@ def check_overfitting(train_losses, val_losses=None, train_accuracies=None, val_
         'val_loss_trend': np.diff(val_loss_ma[-sustained_period:]).mean() if val_losses and len(val_loss_ma) >= sustained_period else None,
         'min_val_loss': min(val_losses) if val_losses else None,
         'final_val_loss': val_losses[-1] if val_losses else None,
-        'train_accuracy': train_accuracies if train_accuracies else None,
-        'val_accuracy': val_accuracies if val_accuracies else None,
+        'train_mse': train_mse if train_mse else None,
+        'val_mse': val_mse if val_mse else None,
         'message': None
     }
 
@@ -63,10 +60,10 @@ def check_overfitting(train_losses, val_losses=None, train_accuracies=None, val_
             is_overfitting = True
             analysis['message'] = 'Validation loss is increasing while training loss decreases'
 
-        # Condition 5: Validation accuracy decreasing while training accuracy increases
-        elif val_accuracies and train_accuracies and np.diff(val_acc_ma[-sustained_period:]).mean() < 0 and np.diff(train_acc_ma[-sustained_period:]).mean() > 0:
+        # Condition 5: Validation MSE increasing while training MSE decreases
+        elif val_mse and train_mse and np.diff(val_mse_ma[-sustained_period:]).mean() > 0 and np.diff(train_mse_ma[-sustained_period:]).mean() < 0:
             is_overfitting = True
-            analysis['message'] = 'Validation accuracy is decreasing while training accuracy increases'
+            analysis['message'] = 'Validation MSE is increasing while training MSE decreases'
 
         else:
             analysis['message'] = 'No clear signs of overfitting detected'
@@ -85,10 +82,10 @@ def check_overfitting(train_losses, val_losses=None, train_accuracies=None, val_
         'best_val_loss': min(val_losses) if val_losses else None,
         'final_val_loss': val_losses[-1] if val_losses else None,
         'val_loss_improvement': (val_losses[0] - val_losses[-1]) / val_losses[0] * 100 if val_losses else None,
-        'best_train_accuracy': max(train_accuracies) if train_accuracies else None,
-        'final_train_accuracy': train_accuracies[-1] if train_accuracies else None,
-        'best_val_accuracy': max(val_accuracies) if val_accuracies else None,
-        'final_val_accuracy': val_accuracies[-1] if val_accuracies else None
+        'best_train_mse': min(train_mse) if train_mse else None,
+        'final_train_mse': train_mse[-1] if train_mse else None,
+        'best_val_mse': min(val_mse) if val_mse else None,
+        'final_val_mse': val_mse[-1] if val_mse else None
     }
 
     # Plot training and validation loss
@@ -105,18 +102,18 @@ def check_overfitting(train_losses, val_losses=None, train_accuracies=None, val_
         plt.savefig('loss_plot.png')
     plt.show()
 
-    # Plot training and validation accuracy
-    if train_accuracies and val_accuracies:
+    # Plot training and validation MSE
+    if train_mse and val_mse:
         plt.figure(figsize=(8, 6))
-        plt.plot(epochs, train_accuracies, label='Training (MAE) Accuracy')
-        plt.plot(epochs, val_accuracies, label='Validation (MAE) Accuracy')
+        plt.plot(epochs, train_mse, label='Training MSE')
+        plt.plot(epochs, val_mse, label='Validation MSE')
         plt.xlabel('Epoch')
-        plt.ylabel('Accuracy (MAE)')
-        plt.title('Accuracy (MAE) Over Epochs')
+        plt.ylabel('MSE')
+        plt.title('MSE Over Epochs')
         plt.legend()
         plt.grid(True)
         if save_plots:
-            plt.savefig('accuracy_plot.png')
+            plt.savefig('mse_plot.png')
         plt.show()
 
     return is_overfitting, analysis
