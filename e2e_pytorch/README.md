@@ -87,7 +87,7 @@ The model's performance is evaluated using various metrics, including training l
 The `check_overfitting` function analyzes the training/validation loss and accuracy to detect signs of overfitting:
 ```bash
 is_overfitting, analysis = check_overfitting(
-    train_losses, val_losses, train_accuracies, val_accuracies, save_plots=True
+    train_losses, val_losses, train_mse, val_mse, save_plots=True
 )
 print(f"\nOverfitting detected: {is_overfitting}")
 print(f"Analysis: {analysis['message']}")
@@ -98,10 +98,10 @@ print(f"Best train loss: {analysis['statistics']['best_train_loss']:.6f}")
 print(f"Final train loss: {analysis['statistics']['final_train_loss']:.6f}")
 print(f"Best val loss: {analysis['statistics']['best_val_loss']:.6f}")
 print(f"Final val loss: {analysis['statistics']['final_val_loss']:.6f}")
-print(f"Best train MAE: {analysis['statistics']['best_train_accuracy']:.4f}")
-print(f"Final train MAE: {analysis['statistics']['final_train_accuracy']:.4f}")
-print(f"Best val MAE: {analysis['statistics']['best_val_accuracy']:.4f}")
-print(f"Final val MAE: {analysis['statistics']['final_val_accuracy']:.4f}")
+print(f"Best train MSE: {analysis['statistics']['best_train_mse']:.4f}")
+print(f"Final train MSE: {analysis['statistics']['final_train_mse']:.4f}")
+print(f"Best val MSE: {analysis['statistics']['best_val_mse']:.4f}")
+print(f"Final val MSE: {analysis['statistics']['final_val_mse']:.4f}")
 print(f"Total improvement: {analysis['statistics']['val_loss_improvement']:.2f}%")
 ```
 
